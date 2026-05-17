@@ -50,6 +50,7 @@ import {
 import { initializeI18n } from "./i18n"
 import { initializeModelCacheRefresh } from "./api/providers/fetchers/modelCache"
 import { initZooCodeAuth } from "./services/zoo-code-auth"
+import { MessageBridge } from "./services/remote"
 
 /**
  * Built using https://github.com/microsoft/vscode-webview-ui-toolkit
@@ -62,6 +63,7 @@ import { initZooCodeAuth } from "./services/zoo-code-auth"
 let outputChannel: vscode.OutputChannel
 let extensionContext: vscode.ExtensionContext
 let cloudService: CloudService | undefined
+let messageBridge: MessageBridge | undefined
 
 let authStateChangedHandler: ((data: { state: AuthState; previousState: AuthState }) => Promise<void>) | undefined
 let settingsUpdatedHandler: (() => void) | undefined
@@ -232,6 +234,28 @@ export async function activate(context: vscode.ExtensionContext) {
 	// Finish initializing the provider.
 	TelemetryService.instance.setProvider(provider)
 
+	// Initialize remote access transports (WebUI + Discord).
+	// This runs in the background; failures are non-fatal.
+	messageBridge = new MessageBridge(context, outputChannel)
+	try {
+		await messageBridge.initialize(async (message) => {
+			// Forward messages from remote transports to the ClineProvider's handler
+			await provider.handleWebviewMessage(message)
+		})
+
+		// Extend postStateToWebview to also broadcast to remote transports
+		const originalPostState = provider.postStateToWebview.bind(provider)
+		provider.postStateToWebview = async () => {
+			await originalPostState()
+			// Broadcast the current state to all WebSocket clients
+			messageBridge?.broadcastState(provider.getStateToPostToWebview())
+		}
+	} catch (error) {
+		outputChannel.appendLine(
+			`[MessageBridge] Initialization failed: ${error instanceof Error ? error.message : String(error)}`,
+		)
+	}
+
 	context.subscriptions.push(
 		vscode.window.registerWebviewViewProvider(ClineProvider.sideBarId, provider, {
 			webviewOptions: { retainContextWhenHidden: true },
@@ -381,6 +405,18 @@ export async function deactivate() {
 		} catch (error) {
 			outputChannel.appendLine(
 				`Failed to clean up CloudService event handlers: ${error instanceof Error ? error.message : String(error)}`,
+			)
+		}
+	}
+
+	// Clean up remote transport services
+	if (messageBridge) {
+		try {
+			await messageBridge.dispose()
+			outputChannel.appendLine("MessageBridge disposed")
+		} catch (error) {
+			outputChannel.appendLine(
+				`Failed to dispose MessageBridge: ${error instanceof Error ? error.message : String(error)}`,
 			)
 		}
 	}

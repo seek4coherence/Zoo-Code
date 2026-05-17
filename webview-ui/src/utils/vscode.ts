@@ -1,11 +1,15 @@
 import type { WebviewApi } from "vscode-webview"
 
 import { WebviewMessage } from "@roo/WebviewMessage"
+import { WsTransport, getWsTransport } from "./wsTransport"
 
 /**
  * A utility wrapper around the acquireVsCodeApi() function, which enables
  * message passing and state management between the webview and extension
  * contexts.
+ *
+ * When running in standalone browser mode (via the RemoteWebServer), this
+ * automatically falls back to WebSocket-based transport.
  *
  * This utility also enables webview code to be run in a web browser-based
  * dev server by using native web browser features that mock the functionality
@@ -13,6 +17,7 @@ import { WebviewMessage } from "@roo/WebviewMessage"
  */
 class VSCodeAPIWrapper {
 	private readonly vsCodeApi: WebviewApi<unknown> | undefined
+	private wsTransport: WsTransport | null = null
 
 	constructor() {
 		// Check if the acquireVsCodeApi function exists in the current development
@@ -25,16 +30,20 @@ class VSCodeAPIWrapper {
 	/**
 	 * Post a message (i.e. send arbitrary data) to the owner of the webview.
 	 *
-	 * @remarks When running webview code inside a web browser, postMessage will instead
-	 * log the given message to the console.
+	 * @remarks
+	 * - In VS Code webview: Uses postMessage API.
+	 * - In standalone browser (RemoteWebUI): Uses WebSocket transport.
+	 * - In dev browser without WebSocket: Logs to console.
 	 *
 	 * @param message Arbitrary data (must be JSON serializable) to send to the extension context.
 	 */
 	public postMessage(message: WebviewMessage) {
 		if (this.vsCodeApi) {
 			this.vsCodeApi.postMessage(message)
+		} else if (this.getWsTransport()) {
+			this.getWsTransport()!.postMessage(message)
 		} else {
-			console.log(message)
+			console.log("[VsCodeAPI] WebSocket not available, message logged:", message.type)
 		}
 	}
 
@@ -72,6 +81,39 @@ class VSCodeAPIWrapper {
 		} else {
 			localStorage.setItem("vscodeState", JSON.stringify(newState))
 			return newState
+		}
+	}
+
+	/**
+	 * Initialize the WebSocket transport for standalone browser mode.
+	 * Called once by ExtensionStateContext when running outside VS Code.
+	 *
+	 * @param handler Callback that receives incoming state updates from the extension.
+	 */
+	public connectWebSocket(handler: (message: any) => void): void {
+		const transport = this.getWsTransport()
+		if (transport) {
+			transport.connect(handler)
+		}
+	}
+
+	/**
+	 * Check if we're running in standalone browser mode (not VS Code webview).
+	 */
+	public isStandalone(): boolean {
+		return typeof acquireVsCodeApi !== "function"
+	}
+
+	// ─── Private helpers ────────────────────────────────────────────────
+
+	private getWsTransport(): WsTransport | null {
+		if (this.wsTransport) return this.wsTransport
+
+		try {
+			this.wsTransport = getWsTransport()
+			return this.wsTransport
+		} catch {
+			return null
 		}
 	}
 }

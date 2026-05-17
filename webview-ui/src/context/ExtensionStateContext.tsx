@@ -463,7 +463,21 @@ export const ExtensionStateContextProvider: React.FC<{ children: React.ReactNode
 	)
 
 	useEffect(() => {
+		// In VS Code webview, use the standard postMessage event listener
 		window.addEventListener("message", handleMessage)
+
+		// In standalone browser mode, connect via WebSocket
+		if (vscode.isStandalone()) {
+			vscode.connectWebSocket((stateUpdate: any) => {
+				// Route WebSocket state updates through the same handleMessage path.
+				// The remote server sends ExtensionState objects directly, which the
+				// existing handler can process as if they came from VS Code postMessage.
+				if (stateUpdate) {
+					handleMessage({ data: stateUpdate } as MessageEvent)
+				}
+			})
+		}
+
 		return () => {
 			window.removeEventListener("message", handleMessage)
 		}
