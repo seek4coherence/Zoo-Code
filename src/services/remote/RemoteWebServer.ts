@@ -194,7 +194,7 @@ export class RemoteWebServer {
 			this.app.use(express.static(webviewDist))
 
 			// SPA fallback: serve index.html for all non-API routes
-			this.app.get("*", (req, res, next) => {
+			this.app.get("*", (req: express.Request, res: express.Response, next: express.NextFunction) => {
 				// Skip API/auth routes
 				if (req.path.startsWith("/api/") || req.path.startsWith("/auth/")) {
 					return next()
@@ -217,7 +217,7 @@ export class RemoteWebServer {
 
 	private setupRoutes(): void {
 		// Health check
-		this.app.get("/api/health", (_req, res) => {
+		this.app.get("/api/health", (_req: express.Request, res: express.Response) => {
 			res.json({ status: "ok", clients: this.clients.size, timestamp: Date.now() })
 		})
 	}
@@ -274,7 +274,7 @@ export class RemoteWebServer {
 				}),
 			)
 
-			ws.on("message", async (data) => {
+			ws.on("message", async (data: Buffer) => {
 				try {
 					const parsed = JSON.parse(data.toString())
 					if (this.messageHandler) {
@@ -299,7 +299,7 @@ export class RemoteWebServer {
 				this.outputChannel.appendLine(`[RemoteWebServer] WebSocket client disconnected: ${clientId}`)
 			})
 
-			ws.on("error", (err) => {
+			ws.on("error", (err: Error) => {
 				this.outputChannel.appendLine(`[RemoteWebServer] WebSocket error for ${clientId}: ${err.message}`)
 				this.clients.delete(clientId)
 			})

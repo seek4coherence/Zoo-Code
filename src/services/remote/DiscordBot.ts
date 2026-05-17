@@ -15,7 +15,7 @@
 
 import type { OutputChannel } from "vscode"
 import type { DiscordConfig, TransportMessageHandler } from "./types"
-import type { WebviewMessage } from "@roo/WebviewMessage"
+import type { WebviewMessage } from "../../shared/WebviewMessage"
 
 /**
  * Minimum Discord.js types we need. We use dynamic imports so

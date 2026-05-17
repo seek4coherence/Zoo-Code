@@ -6,7 +6,7 @@
  * 2. Discord - A Discord bot for private DM-based agent interaction
  */
 
-import type { WebviewMessage } from "@roo/WebviewMessage"
+import type { WebviewMessage } from "../../shared/WebviewMessage"
 
 /**
  * Supported message transport backends.

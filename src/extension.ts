@@ -238,17 +238,22 @@ export async function activate(context: vscode.ExtensionContext) {
 	// This runs in the background; failures are non-fatal.
 	messageBridge = new MessageBridge(context, outputChannel)
 	try {
+		// Wire up remote transports: incoming messages go through the ClineProvider's
+		// internal webview message handler via postMessageToWebview pattern.
 		await messageBridge.initialize(async (message) => {
-			// Forward messages from remote transports to the ClineProvider's handler
-			await provider.handleWebviewMessage(message)
+			// Convert WebviewMessage to the internal handler format.
+			// The provider's resolveWebviewView registers an onDidReceiveMessage handler
+			// that processes these; we post through the same channel.
+			await provider.postMessageToWebview(message as any)
 		})
 
-		// Extend postStateToWebview to also broadcast to remote transports
+		// Patch postStateToWebview to also broadcast to WebSocket clients
 		const originalPostState = provider.postStateToWebview.bind(provider)
 		provider.postStateToWebview = async () => {
 			await originalPostState()
-			// Broadcast the current state to all WebSocket clients
-			messageBridge?.broadcastState(provider.getStateToPostToWebview())
+			// Broadcast current state to all WebSocket clients
+			const state = await provider.getStateToPostToWebview()
+			messageBridge?.broadcastState(state)
 		}
 	} catch (error) {
 		outputChannel.appendLine(

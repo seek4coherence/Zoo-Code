@@ -18,7 +18,7 @@
 
 import * as vscode from "vscode"
 import type { OutputChannel } from "vscode"
-import type { WebviewMessage } from "@roo/WebviewMessage"
+import type { WebviewMessage } from "../../shared/WebviewMessage"
 import type { RemoteAccessConfig, TransportMessage, TransportMessageHandler } from "./types"
 import { DEFAULT_REMOTE_ACCESS_CONFIG, CONFIG_SECTION } from "./types"
 import { RemoteWebServer } from "./RemoteWebServer"
