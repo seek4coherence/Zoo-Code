@@ -162,11 +162,11 @@ export class DiscordBot {
 		}
 
 		// Forward the message to the transport handler
-		const webviewMessage: WebviewMessage = {
+		const webviewMessage = {
 			type: "chatResponse",
 			text: message.content,
 			images: [],
-		} as WebviewMessage
+		} as unknown as WebviewMessage
 
 		if (this.messageHandler) {
 			try {
